@@ -1,0 +1,4044 @@
+controller:
+package controllers;
+
+import models.Patient;
+import models.PatientDAO;
+import models.Case;
+import models.CaseDAO;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class AdminController extends HttpServlet {
+
+    private static final String DB_URL = "jdbc:oracle:thin:@localhost:1521:XE";
+    private static final String DB_USER = "SYSTEM";
+    private static final String DB_PASSWORD = "123123";
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            // Example: Retrieve all patients for display in an admin dashboard
+            PatientDAO patientDAO = new PatientDAO(connection);
+            List<Patient> patients = patientDAO.getAllPatients();
+            request.setAttribute("patients", patients);
+
+            // Forward the request to the JSP view
+            RequestDispatcher dispatcher = request.getRequestDispatcher("adminDashboard.jsp");
+            dispatcher.forward(request, response);
+        } catch (SQLException | ClassNotFoundException ex) {
+            Logger.getLogger(AdminController.class.getName()).log(Level.SEVERE, null, ex);
+            throw new ServletException(ex);
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            // Example: Handle patient registration
+            String firstName = request.getParameter("firstName");
+            String lastName = request.getParameter("lastName");
+            // Add other fields as necessary
+
+            Patient patient = new Patient(firstName, lastName, /* other fields */);
+            PatientDAO patientDAO = new PatientDAO(connection);
+            patientDAO.addPatient(patient);
+
+            // Redirect to a success page or back to the form
+            response.sendRedirect("success.jsp");
+        } catch (SQLException | ClassNotFoundException ex) {
+            Logger.getLogger(AdminController.class.getName()).log(Level.SEVERE, null, ex);
+            throw new ServletException(ex);
+        }
+    }
+}
+/////////////////////////////////////////////////////////////////////////////
+controller2
+package controllers;
+
+import com.okta.authn.sdk.client.AuthenticationClient;
+import com.okta.authn.sdk.client.AuthenticationClients;
+import com.okta.authn.sdk.resource.AuthenticationResponse;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public class AuthenticationController extends HttpServlet {
+
+    private static final String OKTA_DOMAIN = "yourOktaDomain";
+    private static final String OKTA_API_TOKEN = "yourOktaApiToken";
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        String username = request.getParameter("username");
+        String password = request.getParameter("password");
+
+        try {
+            AuthenticationClient client = AuthenticationClients.builder()
+                    .setOrgUrl("https://" + OKTA_DOMAIN)
+                    .build();
+
+            AuthenticationResponse authResponse = client.authenticate(username, password.toCharArray())
+                    .withRelayState("/AdminController") // Redirect to dashboard if credentials are correct
+                    .execute();
+
+            if (authResponse.isSuccess()) {
+                response.sendRedirect(authResponse.getRelayState());
+            } else {
+                request.setAttribute("errorMessage", "Invalid username or password.");
+                RequestDispatcher dispatcher = request.getRequestDispatcher("loginError.jsp");
+                dispatcher.forward(request, response); // Forward to error page if credentials are incorrect
+            }
+        } catch (Exception e) {
+            throw new ServletException("Authentication failed", e);
+        }
+    }
+}
+////////////////////////////////////////////////////////
+controller3
+package controllers;
+
+import models.Patient;
+import models.PatientDAO;
+import models.Case;
+import models.CaseDAO;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
+public class PatientRegistrationController extends HttpServlet {
+
+    private static final String DB_URL = "jdbc:oracle:thin:@localhost:1521:XE";
+    private static final String DB_USER = "SYSTEM";
+    private static final String DB_PASSWORD = "123123";
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            // Example: Handle patient registration
+            String firstName = request.getParameter("firstName");
+            String lastName = request.getParameter("lastName");
+            // Add other fields as necessary
+
+            Patient patient = new Patient(firstName, lastName, /* other fields */);
+            PatientDAO patientDAO = new PatientDAO(connection);
+            patientDAO.addPatient(patient);
+
+            // Redirect to a success page or back to the form
+            response.sendRedirect("success.jsp");
+        } catch (SQLException | ClassNotFoundException ex) {
+            throw new ServletException(ex);
+        }
+    }
+}
+///////////////////////////////////////////////////////////
+controller 4
+package controllers;
+
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.IOException;
+import java.sql.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import models.CaseDAO;
+
+public class CaseManagementController extends HttpServlet {
+
+    private Connection con;
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            con = DriverManager.getConnection("jdbc:oracle:thin:@localhost:1521:XE", "SYSTEM", "123123");
+        } catch (SQLException | ClassNotFoundException ex) {
+            Logger.getLogger(CaseManagementController.class.getName()).log(Level.SEVERE, null, ex);
+            request.setAttribute("error", "Database connection error.");
+            RequestDispatcher requestDispatcher = request.getRequestDispatcher("error.jsp");
+            requestDispatcher.forward(request, response);
+            return;
+        }
+
+        CaseDAO caseDAO = new CaseDAO(con);
+        try {
+            // Example: Clear all cases (use with caution)
+            caseDAO.clearCases();
+            request.setAttribute("message", "All cases have been successfully deleted.");
+        } catch (SQLException e) {
+            request.setAttribute("error", "An error occurred while deleting cases.");
+        }
+
+        RequestDispatcher requestDispatcher = request.getRequestDispatcher("AdminController");
+        requestDispatcher.forward(request, response);
+    }
+}
+/////////////////////////////////////////////////////
+package controllers;
+
+import models.Patient;
+import models.PatientDAO;
+import models.Department;
+import models.DepartmentDAO;
+import models.Case;
+import models.CaseDAO;
+import java.sql.SQLException;
+import java.sql.Connection;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.Date;
+import jakarta.servlet.ServletConfig;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class DatabaseInitializer extends HttpServlet {
+
+    @Override
+    public void init(ServletConfig config) throws ServletException {
+        super.init(config);
+        // System.out.println("Initializing database...");
+        DatabaseUtil.createTables();
+        
+        // Add initial departments
+        try (Connection connection = DatabaseUtil.getConnection()) {
+            DepartmentDAO departmentDAO = new DepartmentDAO(connection);
+            departmentDAO.insertDepartment(new Department("Cardiology"));
+            departmentDAO.insertDepartment(new Department("Neurology"));
+            departmentDAO.insertDepartment(new Department("Orthopedics"));
+            departmentDAO.insertDepartment(new Department("Pediatrics"));
+            departmentDAO.insertDepartment(new Department("Radiology"));
+
+            // Create a PatientDAO for patient-related operations
+            PatientDAO patientDAO = new PatientDAO(connection);
+
+            // Create a CaseDAO for case-related operations
+            CaseDAO caseDAO = new CaseDAO(connection);
+
+            // Example: Add initial patients and cases
+            // This is just an example. You should replace this with actual data relevant to your project.
+            for (int i = 1; i <= 5; i++) {
+                Patient patient = new Patient("Patient " + i, "Doe", "patient" + i + "@example.com");
+                patientDAO.insertPatient(patient);
+
+                Case case1 = new Case(patient, "Cardiology", "Heart murmur detected", LocalDateTime.now());
+                caseDAO.insertCase(case1);
+            }
+
+            // System.out.println("Database initialized.");
+        } catch (SQLException | ClassNotFoundException ex) {
+            Logger.getLogger(DatabaseInitializer.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}
+//////////////////////////////////////////////////////////////////////////
+package controllers;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class DatabaseUtil {
+    
+    private static final String DB_URL = "jdbc:oracle:thin:@localhost:1521:XE";
+    private static final String DB_USER = "SYSTEM";
+    private static final String DB_PASSWORD = "123123";
+
+    public static Connection getConnection() throws SQLException, ClassNotFoundException {
+        Class.forName("oracle.jdbc.driver.OracleDriver");
+        return DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+    }
+
+    public static void createTables() {
+        try (Connection connection = getConnection();
+             Statement statement = connection.createStatement();) {
+            
+            String createPatientsTable = "CREATE TABLE patients (id NUMBER PRIMARY KEY, firstName VARCHAR(50), lastName VARCHAR(50), email VARCHAR(100), phone VARCHAR(20))";
+            statement.execute(createPatientsTable);
+
+            String createDepartmentsTable = "CREATE TABLE departments (id NUMBER PRIMARY KEY, name VARCHAR(50), description VARCHAR(200))";
+            statement.execute(createDepartmentsTable);
+
+            String createCasesTable = "CREATE TABLE cases (id NUMBER PRIMARY KEY, patientId NUMBER, departmentId NUMBER, description VARCHAR(200), dateReported DATE, status VARCHAR(50))";
+            statement.execute(createCasesTable);
+
+            String createPatientDepartmentSequence = "CREATE SEQUENCE patient_seq START WITH 1 INCREMENT BY 1;";
+            statement.execute(createPatientDepartmentSequence);
+
+            String createDepartmentSequence = "CREATE SEQUENCE department_seq START WITH 1 INCREMENT BY 1;";
+            statement.execute(createDepartmentSequence);
+
+            String createCaseSequence = "CREATE SEQUENCE case_seq START WITH 1 INCREMENT BY 1;";
+            statement.execute(createCaseSequence);
+
+        } catch (SQLException e) {
+            Logger.getLogger(DatabaseUtil.class.getName()).log(Level.SEVERE, "Error creating tables", e);
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(DatabaseUtil.class.getName()).log(Level.SEVERE, "Driver not found", ex);
+        }
+    }
+}
+//////////////////////////////////////////////////////////////////
+package controllers;
+
+import models.DepartmentDAO;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import models.Department;
+
+public class HomeController extends HttpServlet {
+
+    private static final String DB_URL = "jdbc:oracle:thin:@localhost:1521:XE";
+    private static final String DB_USER = "SYSTEM";
+    private static final String DB_PASSWORD = "123123";
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            DepartmentDAO departmentDAO = new DepartmentDAO(connection);
+            List<Department> departments = departmentDAO.getDepartments();
+
+            request.setAttribute("departments", departments);
+
+            RequestDispatcher dispatcher = request.getRequestDispatcher("home.jsp");
+            dispatcher.forward(request, response);
+        } catch (SQLException | ClassNotFoundException ex) {
+            Logger.getLogger(HomeController.class.getName()).log(Level.SEVERE, null, ex);
+            throw new ServletException(ex);
+        }
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        doGet(request, response);
+    }
+}
+//////////////////////////////////////////////////////////////////
+package controllers;
+
+import models.Patient;
+import models.PatientDAO;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class PatientManager {
+    private static final String DB_URL = "jdbc:oracle:thin:@localhost:1521:XE";
+    private static final String DB_USER = "SYSTEM";
+    private static final String DB_PASSWORD = "123123";
+
+    public PatientManager() {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            // Example: Adding a new patient
+            PatientDAO patientDAO = new PatientDAO(connection);
+            Patient newPatient = new Patient("John", "Doe", "john.doe@example.com");
+            patientDAO.insertPatient(newPatient);
+
+            System.out.println("New patient added successfully.");
+        } catch (ClassNotFoundException | SQLException ex) {
+            Logger.getLogger(PatientManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    // Example method to update patient information
+    public void updatePatient(int patientId, String newEmail) {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            PatientDAO patientDAO = new PatientDAO(connection);
+            patientDAO.updatePatientEmail(patientId, newEmail);
+
+            System.out.println("Patient information updated successfully.");
+        } catch (ClassNotFoundException | SQLException ex) {
+            Logger.getLogger(PatientManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    // Example method to retrieve patient information
+    public void getPatientInfo(int patientId) {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
+
+            PatientDAO patientDAO = new PatientDAO(connection);
+            Patient patient = patientDAO.getPatientById(patientId);
+
+            System.out.println("Patient Information: " + patient.toString());
+        } catch (ClassNotFoundException | SQLException ex) {
+            Logger.getLogger(PatientManager.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}
+/////////////////////////////////////////////////////////////////////////////
+package controllers;
+
+import models.Case;
+import models.Patient;
+import models.CaseDAO;
+import models.PatientDAO;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class CaseApprovingController extends HttpServlet {
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        Connection con = null;
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            con = DriverManager.getConnection("jdbc:oracle:thin:@localhost:1521:XE", "SYSTEM", "123123");
+
+            CaseDAO caseDAO = new CaseDAO(con);
+            PatientDAO patientDAO = new PatientDAO(con);
+
+            String caseIdString = request.getParameter("caseId");
+            int caseId = Integer.parseInt(caseIdString);
+
+            Case patientCase = caseDAO.getCaseById(caseId);
+            Patient patient = patientDAO.getPatientById(patientCase.getPatientId());
+
+            if (patient == null) {
+                // If patient is not found, create a new Patient object
+                patient = new Patient(patientCase.getPatientId(), "Unknown", "Unknown", "Unknown");
+            }
+
+            String action = request.getParameter("submit");
+
+            if ("Approve".equals(action)) {
+                patientCase.setStatus("Approved");
+                caseDAO.updateCase(patientCase);
+            } else if ("Disapprove".equals(action)) {
+                patientCase.setStatus("Disapproved");
+                caseDAO.updateCase(patientCase);
+            }
+
+            RequestDispatcher dispatcher = request.getRequestDispatcher("AdminController");
+            dispatcher.forward(request, response);
+        } catch (ClassNotFoundException | SQLException e) {
+            System.out.println(e);
+        } finally {
+            if (con != null) {
+                try {
+                    con.close();
+                } catch (SQLException e) {
+                    System.out.println(e);
+                }
+            }
+        }
+    }
+}
+////////////////////////////////////////////////////
+package controllers;
+
+import jakarta.servlet.RequestDispatcher;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import models.Case;
+import models.CaseDAO;
+import models.Patient;
+import models.PatientDAO;
+
+@MultipartConfig(fileSizeThreshold=1024*2, // 2KB
+                 maxFileSize=1024*1024*10,      // 10MB
+                 maxRequestSize=1024*1024*50)   // 50MB
+
+public class CaseReportingController extends HttpServlet {
+
+    @Override
+    protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
+        try {
+            Class.forName("oracle.jdbc.driver.OracleDriver");
+            Connection con = DriverManager.getConnection("jdbc:oracle:thin:@localhost:1521:XE", "SYSTEM", "123123");
+            CaseDAO caseDAO = new CaseDAO(con);
+            PatientDAO patientDAO = new PatientDAO(con);
+
+            String patientIdString = request.getParameter("patientId");
+            int patientId = Integer.parseInt(patientIdString);
+            Patient patient = patientDAO.getPatientById(patientId);
+
+            if (patient == null) {
+                // If patient is not found, redirect to an error page
+                response.sendRedirect("error.jsp");
+                return;
+            }
+
+            String dateString = request.getParameter("date");
+            SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+            Date date = format.parse(dateString);
+
+            String description = request.getParameter("description");
+            String status = "Pending";
+
+            // Handle file upload
+            Part part = request.getPart("upload"); // Retrieves <input type="file" name="upload">
+            String fileName = Paths.get(part.getSubmittedFileName()).getFileName().toString(); // MSIE fix.
+
+            // Set the save path to the C drive folder named Case_documents
+            String savePath = "C:\\Case_documents";
+
+            File fileSaveDir = new File(savePath);
+            if (!fileSaveDir.exists()) {
+                fileSaveDir.mkdir();
+            }
+
+            String fileSavePath = savePath + File.separator + fileName;
+            part.write(fileSavePath);
+            String documentPath = "file://" + fileSavePath;
+
+            Case newCase = new Case(patientId, date, description, status, documentPath);
+            caseDAO.saveCase(newCase);
+
+            RequestDispatcher rd = request.getRequestDispatcher("success.jsp");
+            rd.forward(request, response);
+        } catch (ClassNotFoundException | SQLException | ParseException ex) {
+            Logger.getLogger(CaseReportingController.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+}
+End of controllers 
+//////////////////////////////////////////////////////////////////////////////
+
+-----models
+package models;
+
+/**
+ *
+ * @author MOHAMMAD
+ */
+public class Department {
+    private String name;
+    private int activeCases;
+    private int totalCases;
+    private int staffCount;
+
+    public Department(String name, int staffCount) {
+        this.name = name;
+        this.staffCount = staffCount;
+        this.activeCases = 0;
+        this.totalCases = 0;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getActiveCases() {
+        return activeCases;
+    }
+
+    public void setActiveCases(int activeCases) {
+        this.activeCases = activeCases;
+    }
+
+    public int getTotalCases() {
+        return totalCases;
+    }
+
+    public void setTotalCases(int totalCases) {
+        this.totalCases = totalCases;
+    }
+
+    public int getStaffCount() {
+        return staffCount;
+    }
+
+    public void setStaffCount(int staffCount) {
+        this.staffCount = staffCount;
+    }
+
+    public boolean isOverloaded() {
+        return activeCases > staffCount * 2; // Assuming a department is considered overloaded if it has more than twice the number of active cases as staff
+    }
+
+    public void incrementActiveCases() {
+        this.activeCases++;
+    }
+
+    public void incrementTotalCases() {
+        this.totalCases++;
+    }
+}
+/////////////////////////////////////////////////////////
+package models;
+
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class DepartmentDAO {
+    private Connection connection;
+
+    public DepartmentDAO(Connection connection) {
+        this.connection = connection;
+    }
+
+    public List<Department> getDepartments() throws SQLException {
+        List<Department> departments = new ArrayList<>();
+        Statement statement = null;
+        ResultSet resultSet = null;
+        try {
+            statement = connection.createStatement();
+            resultSet = statement.executeQuery("SELECT * FROM departments");
+
+            while (resultSet.next()) {
+                Department department = new Department(
+                    resultSet.getString("name"),
+                    resultSet.getInt("staffCount"));
+                    
+                department.setActiveCases(resultSet.getInt("activeCases"));
+                department.setTotalCases(resultSet.getInt("totalCases"));
+
+                departments.add(department);
+            }
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (statement != null) {
+                statement.close();
+            }
+        }
+
+        return departments;
+    }
+
+    public Department getDepartmentByName(String name) throws SQLException {
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        try {
+            preparedStatement = connection.prepareStatement("SELECT * FROM departments WHERE name = ?");
+            preparedStatement.setString(1, name);
+            resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                Department department = new Department(
+                    resultSet.getString("name"),
+                    resultSet.getInt("staffCount"));
+                    
+                department.setActiveCases(resultSet.getInt("activeCases"));
+                department.setTotalCases(resultSet.getInt("totalCases"));
+
+                return department;
+            } else {
+                return null;
+            }
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public void insertDepartment(Department department) throws SQLException {
+        PreparedStatement preparedStatement;
+        preparedStatement = null;
+        try {
+            preparedStatement = connection.prepareStatement("INSERT INTO departments (name, staffCount, activeCases, totalCases) VALUES (?, ?, ?, ?)");
+            
+            preparedStatement.setString(1, department.getName());
+            preparedStatement.setInt(2, department.getStaffCount());
+            preparedStatement.setInt(3, department.getActiveCases());
+            preparedStatement.setInt(4, department.getTotalCases());
+
+            preparedStatement.executeUpdate();
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public void updateDepartment(Department department) throws SQLException {
+        PreparedStatement preparedStatement;
+        preparedStatement = null;
+        try {
+            preparedStatement = connection.prepareStatement("UPDATE departments SET name = ?, staffCount = ?, activeCases = ?, totalCases = ? WHERE name = ?");
+            
+            preparedStatement.setString(1, department.getName());
+            preparedStatement.setInt(2, department.getStaffCount());
+            preparedStatement.setInt(3, department.getActiveCases());
+            preparedStatement.setInt(4, department.getTotalCases());
+            preparedStatement.setString(5, department.getName());
+
+            preparedStatement.executeUpdate();
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public void deleteDepartment(String name) throws SQLException {
+        PreparedStatement preparedStatement;
+        preparedStatement = null;
+        try {
+            preparedStatement = connection.prepareStatement("DELETE FROM departments WHERE name = ?");
+            preparedStatement.setString(1, name);
+            preparedStatement.executeUpdate();
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+}
+/////////////////////////////////////////////////////////////////////////////////////////
+package models;
+
+/**
+ *
+ * @author MOHAMMAD
+ */
+public class Hospital {
+    private String name;
+    private String country;
+    private List<Department> departments;
+
+    // Constructor
+    public Hospital(String name, String country) {
+        this.name = name;
+        this.country = country;
+        this.departments = new ArrayList<>();
+    }
+
+    // Getter and setter
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getCountry() {
+        return country;
+    }
+
+    public void setCountry(String country) {
+        this.country = country;
+    }
+
+    public List<Department> getDepartments() {
+        return departments;
+    }
+
+    public void addDepartment(Department department) {
+        this.departments.add(department);
+    }
+
+    public void removeDepartment(Department department) {
+        this.departments.remove(department);
+    }
+}
+////////////////////////////////////////////////////////////////
+package models;
+
+import java.util.Date;
+
+public class EmergencyReport {
+    private int id;
+    private Patient patient;
+    private Date reportDate;
+    private String department;
+    private String emergencyType;
+    private String description;
+    private String status;
+
+    public EmergencyReport(int id, Patient patient, Date reportDate, String department, String emergencyType, String description) {
+        this.id = id;
+        this.patient = patient;
+        this.reportDate = reportDate;
+        this.department = department;
+        this.emergencyType = emergencyType;
+        this.description = description;
+        this.status = "Pending"; // Default status when a report is created
+    }
+
+    public EmergencyReport() {
+        this.status = "Pending"; // Default status when a report is created
+    }
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public Patient getPatient() {
+        return patient;
+    }
+
+    public void setPatient(Patient patient) {
+        this.patient = patient;
+    }
+
+    public Date getReportDate() {
+        return reportDate;
+    }
+
+    public void setReportDate(Date reportDate) {
+        this.reportDate = reportDate;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    public String getEmergencyType() {
+        return emergencyType;
+    }
+
+    public void setEmergencyType(String emergencyType) {
+        this.emergencyType = emergencyType;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+}
+///////////////////////////////////////////////////////////
+package models;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
+public class EmergencyReportDAO {
+    private Connection connection;
+
+    public EmergencyReportDAO(Connection connection) {
+        this.connection = connection;
+    }
+
+    public List<EmergencyReport> getEmergencyReports() throws SQLException {
+        List<EmergencyReport> reports = new ArrayList<>();
+        Statement statement = null;
+        ResultSet resultSet = null;
+        try {
+            statement = connection.createStatement();
+            resultSet = statement.executeQuery("SELECT * FROM emergency_reports");
+
+            while (resultSet.next()) {
+                Patient patient = new Patient(resultSet.getString("patient_id")); // Assuming Patient class exists
+                Date reportDate = new Date(resultSet.getDate("report_date").getTime());
+
+                EmergencyReport report = new EmergencyReport(
+                    resultSet.getInt("id"),
+                    patient,
+                    reportDate,
+                    resultSet.getString("department"),
+                    resultSet.getString("emergency_type"),
+                    resultSet.getString("description"));
+                report.setStatus(resultSet.getString("status"));
+
+                reports.add(report);
+            }
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (statement != null) {
+                statement.close();
+            }
+        }
+
+        return reports;
+    }
+
+    public void saveEmergencyReport(EmergencyReport report) throws SQLException {
+        PreparedStatement preparedStatement = null;
+        try {
+            String sql = "INSERT INTO emergency_reports (patient_id, report_date, department, emergency_type, description, status) VALUES (?, ?, ?, ?, ?, ?)";
+            preparedStatement = connection.prepareStatement(sql);
+
+            preparedStatement.setString(1, report.getPatient().getId());
+            preparedStatement.setDate(2, new java.sql.Date(report.getReportDate().getTime()));
+            preparedStatement.setString(3, report.getDepartment());
+            preparedStatement.setString(4, report.getEmergencyType());
+            preparedStatement.setString(5, report.getDescription());
+            preparedStatement.setString(6, report.getStatus());
+
+            preparedStatement.executeUpdate();
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public void updateEmergencyReport(EmergencyReport report) throws SQLException {
+        PreparedStatement preparedStatement = null;
+        try {
+            String sql = "UPDATE emergency_reports SET patient_id = ?, report_date = ?, department = ?, emergency_type = ?, description = ?, status = ? WHERE id = ?";
+            preparedStatement = connection.prepareStatement(sql);
+
+            preparedStatement.setString(1, report.getPatient().getId());
+            preparedStatement.setDate(2, new java.sql.Date(report.getReportDate().getTime()));
+            preparedStatement.setString(3, report.getDepartment());
+            preparedStatement.setString(4, report.getEmergencyType());
+            preparedStatement.setString(5, report.getDescription());
+            preparedStatement.setString(6, report.getStatus());
+            preparedStatement.setInt(7, report.getId());
+
+            preparedStatement.executeUpdate();
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public EmergencyReport getEmergencyReportById(int reportId) throws SQLException {
+        PreparedStatement preparedStatement = null;
+        ResultSet resultSet = null;
+        try {
+            preparedStatement = connection.prepareStatement("SELECT * FROM emergency_reports WHERE id = ?");
+            preparedStatement.setInt(1, reportId);
+            resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+                Patient patient = new Patient(resultSet.getString("patient_id")); // Assuming Patient class exists
+                Date reportDate = new Date(resultSet.getDate("report_date").getTime());
+
+                EmergencyReport report = new EmergencyReport(
+                    resultSet.getInt("id"),
+                    patient,
+                    reportDate,
+                    resultSet.getString("department"),
+                    resultSet.getString("emergency_type"),
+                    resultSet.getString("description"));
+                report.setStatus(resultSet.getString("status"));
+
+                return report;
+            } else {
+                return null;
+            }
+        } finally {
+            if (resultSet != null) {
+                resultSet.close();
+            }
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public void deleteEmergencyReport(int reportId) throws SQLException {
+        PreparedStatement preparedStatement = null;
+        try {
+            String sql = "DELETE FROM emergency_reports WHERE id = ?";
+            preparedStatement = connection.prepareStatement(sql);
+
+            preparedStatement.setInt(1, reportId);
+            preparedStatement.executeUpdate();
+        } finally {
+            if (preparedStatement != null) {
+                preparedStatement.close();
+            }
+        }
+    }
+
+    public void clearEmergencyReports() throws SQLException {
+        Statement statement = null;
+        try {
+            statement = connection.createStatement();
+            statement.executeUpdate("DELETE FROM emergency_reports");
+        } finally {
+            if (statement != null) {
+                statement.close();
+            }
+        }
+    }
+}
+////////////////////////////////////////////////////////////
+package models;
+
+public class HospitalUser {
+    private String id;
+    private String name;
+    private String phoneNumber;
+    private String email;
+    private String role; // e.g., "Patient", "Doctor", "Nurse", "Admin"
+    private String department; // e.g., "Cardiology", "Neurology", "General"
+    private int falseReports;
+
+    // Constructor for Patients
+    public HospitalUser(String id, String name, String phoneNumber, String email, String role, String department) {
+        this.id = id;
+        this.name = name;
+        this.phoneNumber = phoneNumber;
+        this.email = email;
+        this.role = role;
+        this.department = department;
+        this.falseReports = 0;
+    }
+
+    // Constructor for Staff
+    public HospitalUser(String id, String name, String phoneNumber, String email, String role) {
+        this.id = id;
+        this.name = name;
+        this.phoneNumber = phoneNumber;
+        this.email = email;
+        this.role = role;
+        this.falseReports = 0;
+    }
+
+    // Getters and setters
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPhoneNumber() {
+        return phoneNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.phoneNumber = phoneNumber;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
+    public String getDepartment() {
+        return department;
+    }
+
+    public void setDepartment(String department) {
+        this.department = department;
+    }
+
+    public int getFalseReports() {
+        return falseReports;
+    }
+
+    public void setFalseReports(int falseReports) {
+        this.falseReports = falseReports;
+    }
+
+    public void incrementFalseReports() {
+        this.falseReports += 1;
+    }
+
+    public boolean isBlocked() {
+        return falseReports > 3;
+    }
+}
+///////////////////////////////////////////
+package models;
+
+import java.sql.*;
+
+public class HospitalUserDAO {
+    private Connection con;
+
+    public HospitalUserDAO(Connection con) {
+        this.con = con;
+    }
+
+    public HospitalUser getUserByPhoneNumber(String phoneNumber) {
+        HospitalUser user = null;
+        try {
+            String query = "SELECT * FROM hospital_users WHERE phone_number = ?";
+            PreparedStatement stmt = con.prepareStatement(query);
+            stmt.setString(1, phoneNumber);
+
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                user = new HospitalUser(
+                    rs.getString("id"),
+                    rs.getString("name"),
+                    rs.getString("phone_number"),
+                    rs.getString("email"),
+                    rs.getString("role"),
+                    rs.getString("department")
+                );
+                user.setFalseReports(rs.getInt("false_reports"));
+            }
+        } catch (SQLException e) {
+            // Handle exception as needed
+        }
+
+        return user;
+    }
+
+    public void updateUser(HospitalUser user) {
+        try {
+            String query = "UPDATE hospital_users SET false_reports = ? WHERE phone_number = ?";
+            PreparedStatement stmt = con.prepareStatement(query);
+
+            stmt.setInt(1, user.getFalseReports());
+            stmt.setString(2, user.getPhoneNumber());
+
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            // Handle exception as needed
+        }
+    }
+
+    public void insertUser(HospitalUser user) {
+        try {
+            String query = "INSERT INTO hospital_users (id, name, phone_number, email, role, department, false_reports) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            PreparedStatement stmt = con.prepareStatement(query);
+
+            stmt.setString(1, user.getId());
+            stmt.setString(2, user.getName());
+            stmt.setString(3, user.getPhoneNumber());
+            stmt.setString(4, user.getEmail());
+            stmt.setString(5, user.getRole());
+            stmt.setString(6, user.getDepartment());
+            stmt.setInt(7, user.getFalseReports());
+
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            // Handle exception as needed
+        }
+    }
+}
+/////////////////////////////////////////////////////
+package models;
+
+public enum EmergencyType {
+    MEDICAL_EMERGENCY,
+    FIRE_ALARM,
+    POWER_OUTAGE,
+    SECURITY_INCIDENT,
+    PATIENT_FALL,
+    EQUIPMENT_FAILURE
+}
+//////////////////////////////////////////////////////
+web
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page import="java.util.List" %>
+<%@ page import="models.EmergencyReport" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Emergency Management Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .dashboard-title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th, table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        table th {
+            background-color: green;
+        }
+
+        .action-button {
+            padding: 5px 10px;
+            background-color: #4caf50;
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .action-button:hover {
+            background-color: #45a049;
+        }
+        
+        .home-button {
+            margin-top: 20px;
+            background-color: #2e59d9;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+     <div class="dashboard-container">
+        <h1 class="dashboard-title">Hospital Emergency Management Dashboard</h1>
+        <table>
+            <tr>
+                <th>Report ID</th>
+                <th>Patient ID</th>
+                <th>Report Date</th>
+                <th>Department</th>
+                <th>Emergency Type</th>
+                <th>Description</th>
+                <th>Status</th>
+                <th>Action</th>
+            </tr>
+            <% List<EmergencyReport> reports = (List<EmergencyReport>) request.getSession().getAttribute("emergencyReports"); %>
+            <% for (EmergencyReport report : reports) { %>
+                <tr>
+                    <td><%= report.getId() %></td>
+                    <td><%= report.getPatient().getId() %></td>
+                    <td><%= report.getReportDate() %></td>
+                    <td><%= report.getDepartment() %></td>
+                    <td><%= report.getEmergencyType() %></td>
+                    <td><%= report.getDescription() %></td>
+                    <td><%= report.getStatus() %></td>
+                    <td>
+                        <% if(report.getStatus().equals("Pending")){ %>
+                        <form action="UpdateEmergencyReportStatusController" method="get">
+                            <input type="hidden" name="reportId" value="<%= report.getId() %>">
+                            <input class="action-button" type="submit" name="submit" value="Approve">
+                            <input class="action-button" type="submit" name="submit" value="Disapprove">
+                        </form>
+                            <% } %>
+                    </td>
+                </tr>
+            <% } %>
+        </table>
+        
+        <form action="ClearEmergencyReportsController" method="get">
+            <input class="action-button" type="submit" value="Clear All Emergency Reports">
+        </form>
+        
+        <button class="home-button" onclick="window.location.href='home.jsp'">Go to Home Page</button>
+    </div>
+</body>
+</html>
+////////////////////////////////////////////////////////////////////////////////////////////
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Staff Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+        }
+
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .login-form {
+            max-width: 400px;
+            width: 100%;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-title {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .login-form input[type="text"],
+        .login-form input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            box-sizing: border-box;
+        }
+
+        .login-form input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            background-color: #2e59d9; /* Updated color for hospital theme */
+            color: #fff;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .login-form input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <form class="login-form" action="HospitalStaffAuthenticationController" method="post">
+            <h1 class="login-title">Hospital Staff Login</h1>
+            <input type="text" name="username" placeholder="Staff ID" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <input type="submit" value="Login">
+        </form>
+    </div>
+</body>
+</html>
+/////////////////////////////////////////////////////////////
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page import="models.EmergencyReport" %>
+<%@ page import="models.HospitalAdmin" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Process Emergency Report</title>
+</head>
+<body>
+    <h1>Process Emergency Report</h1>
+    <% String reportId = request.getParameter("reportId"); %>
+    <% EmergencyReport report = HospitalAdmin.getEmergencyReportById(reportId); %>
+    <% if (report != null) { %>
+        <% if (request.getParameter("approve") != null) { %>
+            <% HospitalAdmin.approveEmergencyReport(report); %>
+            <p>Emergency report approved successfully!</p>
+        <% } else if (request.getParameter("disapprove") != null) { %>
+            <% HospitalAdmin.disapproveEmergencyReport(report); %>
+            <p>Emergency report disapproved successfully!</p>
+        <% } %>
+    <% } %>
+</body>
+</html>
+//////////////////////////////
+<%@ include file="home.jsp" %>
+<%@ page import="models.Hospital" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Hospital Information</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 20px;
+        }
+        h1 {
+            color: #333;
+        }
+        .hospital-info {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .hospital-info p {
+            margin: 0;
+            padding: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Hospital Information</h1>
+    
+    <%-- Retrieve the hospital object from the request --%>
+    <%
+        Hospital hospital = (Hospital)request.getAttribute("hospitalInfo");
+    %>
+    
+    <%-- Display the hospital information --%>
+    <% if (hospital != null) { %>
+        <div class="hospital-info">
+            <p><strong>Hospital Name:</strong> <%= hospital.getName() %></p>
+            <p><strong>Location:</strong> <%= hospital.getCity() %>, <%= hospital.getCountry() %></p>
+            <p><strong>Emergency Services:</strong> <%= hospital.getEmergencyServices() %></p>
+            
+            <%-- Conditionally display hospital operational status --%>
+            <% if (hospital.isOperational()) { %>
+                <p>The hospital is currently operational and providing services.</p>
+            <% } else { %>
+                <p>The hospital is currently not operational.</p>
+            <% } %>
+            
+            <%-- Conditionally display hospital safety status --%>
+            <% if (hospital.isSafe()) { %>
+                <p>The hospital is considered safe in terms of emergency response and patient care.</p>
+            <% } else { %>
+                <p>The hospital is currently facing safety concerns.</p>
+            <% } %>
+
+        </div>
+    <% } else { %>
+        <p>Hospital information not found.</p>
+    <% } %>
+</body>
+</html>
+///////////////////////////////////////////////////////
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Error Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            padding: 20px;
+            color: #333;
+        }
+
+        .error-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .error-container h1 {
+            color: #f44336;
+            font-size: 42px;
+            margin-top: 20px;
+        }
+
+        .error-container p {
+            font-size: 18px;
+        }
+
+        .error-container a {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 20px;
+            color: #fff;
+            background-color: #2e59d9; /* Updated color for hospital theme */
+            text-decoration: none;
+            border-radius: 3px;
+        }
+
+        .error-container a:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h1>Error!</h1>
+        <p>An error occurred while processing your request. Please try again later or contact support.</p>
+        <a href="home.jsp">Return to Homepage</a>
+    </div>
+</body>
+</html>
+////////////////////////////////////////////////////////////
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page import="java.util.*" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emergency Report Expired</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            padding: 20px;
+            color: #333;
+        }
+
+        .expired-container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+
+        .expired-container h1 {
+            color: #f44336;
+            font-size: 42px;
+            margin-top: 20px;
+        }
+
+        .expired-container p {
+            font-size: 18px;
+        }
+
+        .expired-container a {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-top: 20px;
+            color: #fff;
+            background-color: #2e59d9; /* Updated color for hospital theme */
+            text-decoration: none;
+            border-radius: 3px;
+        }
+
+        .expired-container a:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="expired-container">
+        <h1>Emergency Report Expired!</h1>
+        <p><%= request.getAttribute("errorMessage") %></p>
+        <a href="emergencyDashboard.jsp">Return to Emergency Dashboard</a>
+    </div>
+</body>
+</html>
+//////////////////////////////////////////////////////
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page import="models.Hospital" %>
+<%@ page import="java.util.List" %>
+<%@ page import="controllers.HospitalController"%>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Hospital Finder</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .banner {
+            background-color: #007bff;
+            color: #fff;
+            padding: 20px 0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .description {
+            text-align: center;
+            padding: 20px;
+        }
+
+        .text-center {
+            text-align: center;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .btn {
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            padding: 10px 20px;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="banner">
+    <h1>Welcome to HospitalAware</h1>
+</div>
+
+<div class="description">
+    <p>Your go-to platform for finding hospitals and emergency services in your city. Stay informed, stay safe!</p>
+</div>
+
+<div class="text-center mt-3 mb-5">
+    <a href="admin_login.jsp" class="btn">Admin Login</a>
+    <a href="reportEmergency.jsp" class="btn">Report an Emergency</a>
+</div>
+
+<div class="container">
+    <h2 class="text-center mt-5">Choose a Hospital</h2>
+    
+    <form action="HospitalController" method="get">
+        <select name="hospitalName" class="mt-4">
+            <% 
+            List<Hospital> hospitals = (List<Hospital>) request.getSession().getAttribute("hospitals");
+            for (Hospital hospital : hospitals) {
+            %>
+                <option value="<%=hospital.getName()%>"><%=hospital.getName()%> (<%=hospital.getLocation()%>)</option>
+            <% } %>
+        </select>
+
+        <input type="submit" value="Show Hospital Details" class="btn mt-4">
+    </form>
+
+</div>
+
+</body>
+</html>
+///////////////////////////////////////////////////////////
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Management System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .header {
+            background-color: #007bff;
+            color: #fff;
+            padding: 20px 0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .content {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .btn {
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            padding: 10px 20px;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Welcome to the Hospital Management System</h1>
+</div>
+
+<div class="content">
+    <h2>Manage Emergency Services</h2>
+    <p>Here you can manage emergency services, including reporting emergencies, updating patient records, and managing staff schedules.</p>
+    <a href="emergencyServices.jsp" class="btn">Go to Emergency Services</a>
+
+    <h2>Manage Patient Records</h2>
+    <p>Access and manage patient records, including medical history, treatment plans, and appointment schedules.</p>
+    <a href="patientRecords.jsp" class="btn">Go to Patient Records</a>
+
+    <h2>Manage Staff</h2>
+    <p>Manage staff information, including scheduling, payroll, and training records.</p>
+    <a href="staffManagement.jsp" class="btn">Go to Staff Management</a>
+</div>
+
+</body>
+</html>
+//////////////////////////////////////////////////////////////
+<%@ page contentType="text/html;charset=UTF-8" language="java" %>
+<%@ page import="java.util.List" %>
+<%@ page import="models.User" %>
+<%@ page import="controllers.UserController" %>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Login Error</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .error-message {
+            color: red;
+            font-size: 1.2em;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .login-form {
+            max-width: 300px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        .login-form input[type="text"],
+        .login-form input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        .login-form input[type="submit"] {
+            width: 100%;
+            padding: 10px;
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+
+        .login-form input[type="submit"]:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+
+<div class="error-message">
+    <%= request.getAttribute("errorMessage") %>
+</div>
+
+<div class="login-form">
+    <form action="UserController" method="post">
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+        <input type="submit" value="Login">
+    </form>
+</div>
+
+</body>
+</html>
+//////////////////////////////////////////////////////
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Report Emergency</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+        }
+    .emergency-report-container {
+        max-width: 400px;
+        margin: 0 auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    }
+
+    .emergency-report-title {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .emergency-report-form label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+
+    .emergency-report-form input[type="text"],
+    .emergency-report-form select {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 10px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        box-sizing: border-box;
+    }
+
+    .emergency-report-form input[type="file"] {
+        margin-bottom: 10px;
+    }
+
+    .emergency-report-form input[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        background-color: #2e59d9;
+        color: #fff;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+    }
+
+    .emergency-report-form input[type="submit"]:hover {
+        background-color: #45a049;
+    }
+
+    </style>
+</head>
+<body>
+    <div class="emergency-report-container">
+        <h1 class="emergency-report-title">Report Emergency</h1>
+        <form class="emergency-report-form" action="EmergencyReportController" method="post" enctype="multipart/form-data">
+           
+        
+            <label for="date">Date:</label>
+            <input type="text" id="date" name="date" readonly>
+
+            <label for="phoneNumber">Contact Number:</label>
+            <input type="text" id="phoneNumber" name="phoneNumber" required>
+
+            <label for="hospitalSelect">Hospital:</label>
+            <select id="hospitalSelect" name="hospital" required>
+                <option value="">Select a hospital</option>
+                <!-- Options for hospitals will be dynamically populated -->
+            </select>
+
+            <label for="upload">Upload Picture/Video:</label>
+            <input type="file" id="upload" name="upload" required>
+
+            <label for="emergencyType">Emergency Type:</label>
+            <select id="emergencyType" name="emergencyType" required>
+                <option value="">Select an emergency type</option>
+                <option value="Heart Attack">Heart Attack</option>
+                <option value="Stroke">Stroke</option>
+                <option value="Accident">Accident</option>
+                <option value="Fire">Fire</option>
+            </select>
+
+            <input type="submit" value="Submit Report">
+        </form>
+    </div>
+</body>
+</html>
+////////////////////////////////////////////////////
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Patient Registration</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="card">
+            <div class="card-header">
+                Register Patient
+            </div>
+            <div class="card-body">
+                <form action="PatientRegistrationServlet" method="post">
+                    <div class="form-group">
+                        <label for="firstName">First Name:</label>
+                        <input type="text" class="form-control" id="firstName" name="firstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name:</label>
+                        <input type="text" class="form-control" id="lastName" name="lastName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dob">Date of Birth:</label>
+                        <input type="date" class="form-control" id="dob" name="dob" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="address">Address:</label>
+                        <input type="text" class="form-control" id="address" name="address" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="medicalHistory">Medical History:</label>
+                        <textarea class="form-control" id="medicalHistory" name="medicalHistory" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="chronicDiseases">Chronic Diseases:</label>
+                        <textarea class="form-control" id="chronicDiseases" name="chronicDiseases" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="allergies">Allergies:</label>
+                        <textarea class="form-control" id="allergies" name="allergies" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email:</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phoneNumber">Phone Number:</label>
+                        <input type="text" class="form-control" id="phoneNumber" name="phoneNumber" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Register</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+////////////////////////////////////////////////////////////////
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Submit Case</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="card">
+            <div class="card-header">
+                Submit Case
+            </div>
+            <div class="card-body">
+                <form action="CaseSubmissionServlet" method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="submitOnBehalf">Submit on behalf of someone else:</label>
+                        <input type="checkbox" id="submitOnBehalf" name="submitOnBehalf">
+                    </div>
+                    <div class="form-group">
+                        <label for="patientName">Patient's Name:</label>
+                        <input type="text" class="form-control" id="patientName" name="patientName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="relationship">Relationship to Patient:</label>
+                        <select class="form-control" id="relationship" name="relationship" required>
+                            <option value="Friend">Friend</option>
+                            <option value="Family">Family</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="symptoms">Symptoms:</label>
+                        <textarea class="form-control" id="symptoms" name="symptoms" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="startDate">When did it start:</label>
+                        <input type="date" class="form-control" id="startDate" name="startDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="isInjured">Is the patient injured?</label>
+                        <input type="checkbox" id="isInjured" name="isInjured">
+                    </div>
+                    <div class="form-group">
+                        <label for="injuryType">Type of Injury:</label>
+                        <input type="text" class="form-control" id="injuryType" name="injuryType">
+                    </div>
+                    <div class="form-group">
+                        <label for="injuryImage">Upload an image of the injury:</label>
+                        <input type="file" class="form-control-file" id="injuryImage" name="injuryImage" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Submit Case</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+////////////////////////////////////////////
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Book Addition Successful</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .success-message {
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #666;
+        }
+        .home-button {
+            margin-top: 20px;
+            background-color: #2e59d9;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-message">
+        <h1>Success!</h1>
+        <p>The book has been successfully added to the inventory.</p>
+        <button class="home-button" onclick="window.location.href='home.jsp'">Return to Home Page</button>
+    </div>
+
+    <%@ include file="addBook.jsp" %>
+</body>
+</html>
+/////////////////////////////////////////////////
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="MyWebApp" default="default" basedir=".">
+    <description>Builds, tests, and runs the project MyWebApp.</description>
+    <import file="nbproject/build-impl.xml"/>
+
+    <target name="makeWAR" description="Bundles the application as a WAR file">
+        <war destfile="MyWebApp.war"
+             basedir="WebContent"
+             needxmlfile="false">
+        </war>
+    </target>
+
+    <target name="default" depends="makeWAR">
+        <echo message="Building WAR file for MyWebApp..."/>
+    </target>
+</project>
+////////////////////////////////////////////////////
+<%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Book Addition Successful</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f2f2f2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        .success-message {
+            background-color: #fff;
+            border-radius: 5px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+        }
+        p {
+            color: #666;
+        }
+        .home-button {
+            margin-top: 20px;
+            background-color: #2e59d9;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="success-message">
+        <h1>Success!</h1>
+        <p>The book has been successfully added to the inventory.</p>
+        <button class="home-button" onclick="window.location.href='home.jsp'">Return to Home Page</button>
+    </div>
+
+    <%@ include file="addBook.jsp" %>
+</body>
+</html>
+////////////////////////////////////////////////////
+<?xml version="1.0" encoding="UTF-8"?>
+<Context path="/MyLibraryApp"/>
+/////////////////////////////////////////
+retriver here :
+<?xml version="1.0" encoding="UTF-8"?>
+<xsd:schema targetNamespace="https://example.com/xml/ns/myapp"
+            xmlns:myapp="https://example.com/xml/ns/myapp"
+            xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            elementFormDefault="qualified"
+            attributeFormDefault="unqualified"
+            version="1.0">
+ <xsd:annotation>
+    <xsd:documentation>XML Schema for MyApp configuration.</xsd:documentation>
+ </xsd:annotation>
+
+ <xsd:import namespace="http://www.w3.org/XML/1998/namespace"
+              schemaLocation="https://www.w3.org/2001/xml.xsd"/>
+
+ <xsd:element name="configuration">
+    <xsd:complexType>
+      <xsd:sequence>
+        <xsd:element name="database" minOccurs="0" maxOccurs="unbounded">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element name="url" type="xsd:string"/>
+              <xsd:element name="username" type="xsd:string"/>
+              <xsd:element name="password" type="xsd:string"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:element name="logging" minOccurs="0" maxOccurs="unbounded">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element name="level" type="xsd:string"/>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+        <xsd:element name="featureToggles" minOccurs="0" maxOccurs="unbounded">
+          <xsd:complexType>
+            <xsd:sequence>
+              <xsd:element name="toggle" minOccurs="0" maxOccurs="unbounded">
+                <xsd:complexType>
+                 <xsd:sequence>
+                    <xsd:element name="name" type="xsd:string"/>
+                    <xsd:element name="enabled" type="xsd:boolean"/>
+                 </xsd:sequence>
+                </xsd:complexType>
+              </xsd:element>
+            </xsd:sequence>
+          </xsd:complexType>
+        </xsd:element>
+      </xsd:sequence>
+    </xsd:complexType>
+ </xsd:element>
+</xsd:schema>
+<xsd:complexType name="context-serviceType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom context service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the context service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the context service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="cleared"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            List of context attributes to be cleared.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="propagated"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            List of context attributes to be propagated.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="unchanged"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            List of context attributes to remain unchanged.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+</xsd:complexType>
+
+<xsd:complexType name="data-sourceType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration of a custom DataSource.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of this DataSource.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The name element specifies the JNDI name of the
+            data source being defined.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="class-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            DataSource, XADataSource or ConnectionPoolDataSource
+            implementation class.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="server-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Database server name.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="port-number"
+                   type="xsd:integer"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Port number where a server is listening for requests.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="database-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Name of a database on a server.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="url"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            A JDBC URL. If the <code>url</code> property is specified
+            along with other standard <code>DataSource</code> properties
+            such as <code>serverName</code>, <code>databaseName</code>
+            and <code>portNumber</code>, the more specific properties will
+            take precedence and <code>url</code> will be ignored.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="user"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            User name to use for connection authentication.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="password"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Password to use for connection authentication.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            JDBC DataSource property. This may be a vendor-specific
+            property or a less commonly used DataSource property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="login-timeout"
+                   type="xsd:integer"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Sets the maximum time in seconds that this data source
+            will wait while attempting to connect to a database.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+</xsd:complexType>
+<xsd:complexType name="context-serviceType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom context service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the context service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the context service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="cleared"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            List of context attributes to be cleared.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="propagated"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            List of context attributes to be propagated.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="unchanged"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            List of context attributes to remain unchanged.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+</xsd:complexType>
+
+<xsd:complexType name="data-sourceType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration of a custom DataSource.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of this DataSource.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The name element specifies the JNDI name of the
+            data source being defined.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="class-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            DataSource, XADataSource or ConnectionPoolDataSource
+            implementation class.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="server-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Database server name.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="port-number"
+                   type="xsd:integer"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Port number where a server is listening for requests.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="database-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Name of a database on a server.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="url"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            A JDBC URL. If the <code>url</code> property is specified
+            along with other standard <code>DataSource</code> properties
+            such as <code>serverName</code>, <code>databaseName</code>
+            and <code>portNumber</code>, the more specific properties will
+            take precedence and <code>url</code> will be ignored.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="user"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            User name to use for connection authentication.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="password"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Password to use for connection authentication.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            JDBC DataSource property. This may be a vendor-specific
+            property or a less commonly used DataSource property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="login-timeout"
+                   type="xsd:integer"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Sets the maximum time in seconds that this data source
+            will wait while attempting to connect to a database.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+</xsd:complexType>
+
+<xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+</xsd:complexType>
+<xsd:complexType name="custom-configType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+</xsd:complexType>
+
+<xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+</xsd:complexType>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="custom-configType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="custom-configType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="custom-configType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="custom-configType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="custom-configType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom service.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the custom service.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="mail-sessionType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration for a custom mail session.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of the mail session.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            Unique identifier for the mail session.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="transport-protocol"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Transport protocol for the mail session.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="transport-protocol-class"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Service provider transport protocol implementation class.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="host"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Mail server host name.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="user"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Mail server user name.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="password"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Password for the mail server.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="from"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Email address to indicate the message sender.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Mail server property. This may be a vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+ <xsd:complexType name="managed-executorType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration of a ManagedExecutorService.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of this ManagedExecutorService.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            JNDI name of the ManagedExecutorService instance being defined.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="context-service-ref"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            Refers to the name of a ContextServiceDefinition or context-service deployment descriptor element.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="max-async"
+                   type="xsd:positiveInteger"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            Upper bound on contextual tasks and actions that this executor will simultaneously execute asynchronously.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="hung-task-threshold"
+                   type="xsd:positiveInteger"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            The amount of time in milliseconds that a task or action can execute before it is considered hung.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="managed-scheduled-executorType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration of a ManagedScheduledExecutorService.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of this ManagedScheduledExecutorService.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            JNDI name of the ManagedScheduledExecutorService instance being defined.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="context-service-ref"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            Refers to the name of a ContextServiceDefinition or context-service deployment descriptor element.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="max-async"
+                   type="xsd:positiveInteger"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            Upper bound on contextual tasks and actions that this executor will simultaneously execute asynchronously.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="hung-task-threshold"
+                   type="xsd:positiveInteger"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            The amount of time in milliseconds that a task or action can execute before it is considered hung.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+ <xsd:complexType name="managed-thread-factoryType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Configuration of a ManagedThreadFactory.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            Description of this ManagedThreadFactory.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            JNDI name of the ManagedThreadFactory instance being defined.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="context-service-ref"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            Refers to the name of a ContextServiceDefinition or context-service deployment descriptor element.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="priority"
+                   type="xsd:integer"
+                   minOccurs="0"
+                   maxOccurs="1">
+        <xsd:annotation>
+          <xsd:documentation>
+            Priority for threads created by this thread factory.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Vendor-specific property.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="param-valueType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type is a general type that can be used to declare parameter/value lists.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="param-name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The param-name element contains the name of a parameter.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="param-value"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The param-value element contains the value of a parameter.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="pathType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The elements that use this type designate either a relative path or an absolute path starting with a "/".
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:string"/>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="persistence-context-refType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The persistence-context-ref element contains a declaration of Deployment Component's reference to a persistence context associated within a Deployment Component's environment.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="persistence-context-ref-name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-context-ref-name element specifies the name of a persistence context reference.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="persistence-unit-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-unit-name element specifies the name of the persistence unit.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="persistence-context-type"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-context-type element specifies the type of the persistence context.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="persistence-context-synchronization"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-context-synchronization element specifies the synchronization type of the persistence context.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="persistence-properties"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-properties element specifies a list of persistence properties.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:sequence>
+      <xsd:element name="name" type="xsd:string"/>
+      <xsd:element name="value" type="xsd:string"/>
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="persistence-context-refType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The persistence-context-ref element contains a declaration of Deployment Component's reference to a persistence context associated within a Deployment Component's environment.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="persistence-context-ref-name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-context-ref-name element specifies the name of a persistence context reference.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="persistence-unit-name"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            The persistence-unit-name element specifies the name of the persistence unit.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="persistence-context-type"
+                   type="persistence-context-typeType"
+                   minOccurs="0"/>
+      <xsd:element name="persistence-context-synchronization"
+                   type="persistence-context-synchronizationType"
+                   minOccurs="0"/>
+      <xsd:element name="persistence-property"
+                   type="propertyType"
+                   minOccurs="0"
+                   maxOccurs="unbounded">
+        <xsd:annotation>
+          <xsd:documentation>
+            Used to specify properties for the container or persistence provider. Vendor-specific properties may be included in the set of properties. Properties that are not recognized by a vendor must be ignored. Entries that make use of the namespace jakarta.persistence and its subnamespaces must not be used for vendor-specific properties. The namespace jakarta.persistence is reserved for use by the specification.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="persistence-context-synchronizationType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The persistence-context-synchronizationType specifies whether a container-managed persistence context is automatically synchronized with the current transaction.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string">
+        <xsd:enumeration value="Synchronized"/>
+        <xsd:enumeration value="Unsynchronized"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="persistence-context-typeType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The persistence-context-typeType specifies the transactional nature of a persistence context reference.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string">
+        <xsd:enumeration value="Transaction"/>
+        <xsd:enumeration value="Extended"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="propertyType">
+    <xsd:annotation>
+      <xsd:documentation>
+        Specifies a name/value pair.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="name"
+                   type="xsd:string"/>
+      <xsd:element name="value"
+                   type="xsd:string"/>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="resource-env-refType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The resource-env-refType is used to define resource-env-ref elements. It contains a declaration of a Deployment Component's reference to an administered object associated with a resource in the Deployment Component's environment.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="resource-env-ref-name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The resource-env-ref-name element specifies the name of a resource environment reference.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="resource-env-ref-type"
+                   type="xsd:string"
+                   minOccurs="0"/>
+      <xsd:element name="resource-group"
+                   type="resourceGroupType"
+                   minOccurs="0"/>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="resource-refType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The resource-refType contains a declaration of a Deployment Component's reference to an external resource.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="res-ref-name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The res-ref-name element specifies the name of a resource manager connection factory reference.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="res-type"
+                   type="xsd:string"
+                   minOccurs="0"/>
+      <xsd:element name="res-auth"
+                   type="resAuthType"
+                   minOccurs="0"/>
+      <xsd:element name="res-sharing-scope"
+                   type="resSharingScopeType"
+                   minOccurs="0"/>
+      <xsd:element name="resource-group"
+                   type="resourceGroupType"
+                   minOccurs="0"/>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="resAuthType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The resAuthType specifies whether the Deployment Component code signs on programmatically to the resource manager, or whether the Container will sign on to the resource manager on behalf of the Deployment Component.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string">
+        <xsd:enumeration value="Application"/>
+        <xsd:enumeration value="Container"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="resSharingScopeType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The resSharingScope type specifies whether connections obtained through the given resource manager connection factory reference can be shared.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string">
+        <xsd:enumeration value="Shareable"/>
+        <xsd:enumeration value="Unshareable"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="runAsType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The runAsType specifies the run-as identity to be used for the execution of a component.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="role-name"
+                   type="xsd:string"/>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="roleNameType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The roleNameType designates the name of a security role.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="resourceGroupType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The resourceGroupType collects elements that are common to all the JNDI resource elements.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <!-- Define elements common to all JNDI resource elements here -->
+    </xsd:sequence>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-security"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="security-roleType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The security-roleType contains the definition of a security role.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="role-name"
+                   type="xsd:string"/>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="security-role-refType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The security-role-refType contains the declaration of a security role reference in a component's or a Deployment Component's code.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="role-name"
+                   type="xsd:string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The value of the role-name element must be the String used as the parameter to the EJBContext.isCallerInRole(String roleName) method or the HttpServletRequest.isUserInRole(String role) method.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="role-link"
+                   type="xsd:string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            The role-link element is a reference to a defined security role.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="xsdQNameType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:QName.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:QName">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="xsdBooleanType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:boolean.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:boolean">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="xsdNMTOKENType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:NMTOKEN.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:NMTOKEN">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="xsdAnyURIType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:anyURI.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:anyURI">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="xsdPositiveIntegerType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:positiveInteger.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:positiveInteger">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="xsdNonNegativeIntegerType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:nonNegativeInteger.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:nonNegativeInteger">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="xsdStringType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This type adds an "id" attribute to xsd:string.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:string">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="string">
+    <xsd:annotation>
+      <xsd:documentation>
+        This is a special string datatype that is defined by Jakarta EE as
+        a base type for defining collapsed strings. When schemas
+        require trailing/leading space elimination as well as
+        collapsing the existing whitespace, this base type may be
+        used.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:token">
+        <xsd:attribute name="id"
+                       type="xsd:ID"/>
+      </xsd:extension>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="true-falseType">
+    <xsd:annotation>
+      <xsd:documentation>
+        This simple type designates a boolean with only two
+        permissible values
+        - true
+        - false
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:boolean">
+        <xsd:pattern value="(true|false)"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="url-patternType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The url-patternType contains the url pattern of the mapping.
+        It must follow the rules specified in Section 11.2 of the
+        Servlet API Specification. This pattern is assumed to be in
+        URL-decoded form and must not contain CR(#xD) or LF(#xA).
+        If it contains those characters, the container must inform
+        the developer with a descriptive error message.
+        The container must preserve all characters including whitespaces.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:extension base="xsd:string"/>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="message-destinationType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The message-destinationType specifies a message
+        destination. The logical destination described by this
+        element is mapped to a physical destination by the Deployer.
+        The message destination element contains: 
+        - an optional description
+        - an optional display-name
+        - an optional icon
+        - a message destination name which must be unique
+        among message destination names within the same 
+        Deployment File. 
+        - an optional mapped name
+        - an optional lookup name
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="message-destination-name"
+                   type="string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The message-destination-name element specifies a
+            name for a message destination. This name must be
+            unique among the names of message destinations
+            within the Deployment File.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="mapped-name"
+                   type="string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            A product specific name that this message destination
+            should be mapped to. Each message-destination-ref
+            element that references this message destination will
+            define a name in the namespace of the referencing
+            component or in one of the other predefined namespaces. 
+            Many application servers provide a way to map these
+            local names to names of resources known to the
+            application server. This mapped name is often a global
+            JNDI name, but may be a name of any form. Each of the
+            local names should be mapped to this same global name.
+            Application servers are not required to support any
+            particular form or type of mapped name, nor the ability
+            to use mapped names. The mapped name is
+            product-dependent and often installation-dependent. No
+            use of a mapped name is portable.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="lookup-name"
+                   type="string"
+                   minOccurs="0">
+        <xsd:annotation>
+          <xsd:documentation>
+            The JNDI name to be looked up to resolve the message destination.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+ <xsd:complexType name="message-destination-refType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The message-destination-ref element contains a declaration
+        of Deployment Component's reference to a message destination
+        associated with a resource in Deployment Component's
+        environment. It consists of:
+        - an optional description
+        - the message destination reference name
+        - an optional message destination type
+        - an optional specification as to whether
+        the destination is used for 
+        consuming or producing messages, or both.
+        if not specified, "both" is assumed.
+        - an optional link to the message destination
+        - optional injection targets
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:sequence>
+      <xsd:element name="description"
+                   type="xsd:string"
+                   minOccurs="0"
+                   maxOccurs="unbounded"/>
+      <xsd:element name="message-destination-ref-name"
+                   type="string">
+        <xsd:annotation>
+          <xsd:documentation>
+            The message-destination-ref-name element specifies
+            the name of a message destination reference; its
+            value is the environment entry name used in
+            Deployment Component code.
+          </xsd:documentation>
+        </xsd:annotation>
+      </xsd:element>
+      <xsd:element name="message-destination-type"
+                   type="string"
+                   minOccurs="0"/>
+      <xsd:element name="message-destination-usage"
+                   type="string"
+                   minOccurs="0"/>
+      <xsd:element name="message-destination-link"
+                   type="string"
+                   minOccurs="0"/>
+    </xsd:sequence>
+    <xsd:attribute name="id"
+                   type="xsd:ID"/>
+ </xsd:complexType>
+
+</xsd:schema>
+<xsd:schema xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+            xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+            targetNamespace="http://www.example.com/custom-config"
+            elementFormDefault="qualified">
+
+ <xsd:complexType name="message-destination-usageType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The message-destination-usageType specifies the use of the
+        message destination indicated by the reference. The value
+        indicates whether messages are consumed from the message
+        destination, produced for the destination, or both. The
+        Assembler makes use of this information in linking producers
+        of a destination with its consumers.
+        
+        The value of the message-destination-usage element must be
+        one of the following:
+        Consumes
+        Produces
+        ConsumesProduces
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string">
+        <xsd:enumeration value="Consumes"/>
+        <xsd:enumeration value="Produces"/>
+        <xsd:enumeration value="ConsumesProduces"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="message-destination-typeType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The message-destination-typeType specifies the type of
+        the destination. The type is specified by the Java interface
+        expected to be implemented by the destination.
+        
+        Example: 
+        
+        <message-destination-type>jakarta.jms.Queue
+        </message-destination-type>
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="message-destination-linkType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The message-destination-linkType is used to link a message
+        destination reference or message-driven bean to a message
+        destination.
+        
+        The Assembler sets the value to reflect the flow of messages
+        between producers and consumers in the application.
+        
+        The value must be the message-destination-name of a message
+        destination in the same Deployment File or in another
+        Deployment File in the same Jakarta EE application unit.
+        
+        Alternatively, the value may be composed of a path name
+        specifying a Deployment File containing the referenced
+        message destination with the message-destination-name of the
+        destination appended and separated from the path name by
+        "#". The path name is relative to the Deployment File
+        containing Deployment Component that is referencing the
+        message destination. This allows multiple message
+        destinations with the same name to be uniquely identified.
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string"/>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+ <xsd:complexType name="transaction-supportType">
+    <xsd:annotation>
+      <xsd:documentation>
+        The transaction-supportType specifies the level of
+        transaction support provided by the resource adapter. It is
+        used by transaction-support elements.
+        
+        The value must be one of the following:
+        
+        NoTransaction
+        LocalTransaction
+        XATransaction
+      </xsd:documentation>
+    </xsd:annotation>
+    <xsd:simpleContent>
+      <xsd:restriction base="xsd:string">
+        <xsd:enumeration value="NoTransaction"/>
+        <xsd:enumeration value="LocalTransaction"/>
+        <xsd:enumeration value="XATransaction"/>
+      </xsd:restriction>
+    </xsd:simpleContent>
+ </xsd:complexType>
+
+</xsd:schema>
+ end of jakartaee_10.xsd
